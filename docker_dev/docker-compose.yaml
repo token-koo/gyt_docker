@@ -1,0 +1,151 @@
+version: '3.5'
+services:
+  Nginx:
+    image: 10.4.60.235:5000/nginx:v0.1
+    container_name: nginx_web1 
+    ports: 
+      - 10400:10400
+    volumes:
+      - ./nginx_web1/nginxdata:/usr/share/nginx/html 
+      - ./nginx_web1/nginxconf/default.conf:/etc/nginx/conf.d/default.conf 
+    networks:
+      default:
+        ipv4_address: 172.23.0.10
+
+  Mysql:
+    image: 10.4.60.235:5000/mysql:v0.1
+    container_name: mysql_db1
+    ports:
+      - 36360:3306
+    volumes:
+      -  ./mysql_db1/data:/var/lib/mysql
+      -  ./mysql_db1/backup:/backup
+    environment:
+        MYSQL_ROOT_PASSWORD: "moxi1234"
+    networks:
+      default:
+        ipv4_address: 172.23.0.11
+
+  Mongo:
+    image: 10.4.60.235:5000/mongo:v0.1
+    container_name: mongo_db1
+    ports: 
+      - 17088:27017
+    volumes:
+      - ./mongo_db1/data:/data/db
+      - ./mongo_db1/backup:/backup/
+    environment:
+        MONGO_INITDB_ROOT_USERNAME: "moxi"
+        MONGO_INITDB_ROOT_PASSWORD: "moxi1234"
+    networks:
+      default:
+        ipv4_address: 172.23.0.12
+  Redis:
+    image: 10.4.60.235:5000/redis:v0.1
+    container_name: redis_db1
+    ports:  
+      - 16379:6379
+    volumes: 
+      - ./redis_db1:/data
+    command: redis-server --appendonly yes
+    networks:
+      default:
+        ipv4_address: 172.23.0.13
+
+  Consul:
+    image: 10.4.60.235:5000/consul:v0.1
+    container_name: consul_db1
+    ports:
+      - 18500:8500
+    volumes:
+      - ./consul_db1/data:/consul/data/
+      - ./consul_db1/config:/consul/config
+    environment:
+        CONSUL_BIND_INTERFACE: "eth0"
+    command: agent --server=true --bootstrap-expect=1 --client=0.0.0.0 -ui
+    networks:
+      default:
+        ipv4_address: 172.23.0.14
+
+  zookeeper:
+    image: 10.4.60.235:5000/zookeeper:v0.1
+    container_name: zkNodeA
+    ports:
+      - 12888:2888
+      - 13888:3888
+    volumes:
+      - ./zkNodeA/zkconf/zoo.cfg:/opt/zkcluster/zookeeper/conf/zoo.cfg
+      - ./zkNodeA/zkdata:/opt/zookeeper/zkdata
+      - ./zkNodeA/zkdatalog:/opt/zookeeper/zkdatalog
+    networks:
+      default:
+        ipv4_address: 172.23.0.15
+  kafka:
+    image: 10.4.60.235:5000/kafka:v0.1
+    container_name: kafkaNodeA
+    ports:
+      - 19092:9092
+    volumes:
+      - ./kafkaNodeA/kafconf/server.properties:/opt/kafkacluster/kafka/config/server.properties
+      - ./kafkaNodeA/kafdata:/opt/kafkacluster/kafkalog
+      - ./kafkaNodeA/kafdatalog:/opt/kafkacluster/kafka/logs
+    depends_on:
+      - zookeeper
+    networks:
+      default:
+        ipv4_address: 172.23.0.16
+
+  rmqnamesrv:
+    image: 10.4.60.235:5000/rocketmqserver:v0.1
+    container_name: rmqnamesrv
+    ports:
+      - 9876:9876
+    volumes:
+      - ./rmqnamesrv/logs:/opt/logs
+      - ./rmqnamesrv/store:/opt/store
+    environment:
+      NAMESRV_ADDR: "rmqnamesrv:9876"
+      JAVA_OPTS: " -Duser.home=/opt"
+      JAVA_OPT_EXT: "-Xms128m -Xmx128m -Xmn128m"
+    networks:
+      default:
+        ipv4_address: 172.23.0.17
+
+  rmqbroker:
+    image: 10.4.60.235:5000/rocketmqbroker:v0.1
+    container_name: rmqbroker
+    ports:
+      - 10909:10909
+      - 10911:10911
+    volumes:
+      - ./rmqbroker/logs:/opt/logs
+      - ./rmqbroker/store:/opt/store
+      - ./rmqbroker/brokerconf/broker.conf:/etc/rocketmq/broker.conf
+    environment:
+        NAMESRV_ADDR: "rmqnamesrv:9876"
+        JAVA_OPTS: " -Duser.home=/opt"
+        JAVA_OPT_EXT: "-server -Xms128m -Xmx128m -Xmn128m"
+    command: mqbroker -c /etc/rocketmq/broker.conf
+    networks:
+      default:
+        ipv4_address: 172.23.0.18
+    depends_on:
+      - rmqnamesrv
+
+  rmqconsole:
+    image: 10.4.60.235:5000/rocketmqconsole:v0.1
+    container_name: rmqconsole
+    ports:
+      - 12581:8080
+    environment:
+        JAVA_OPTS: "-Drocketmq.namesrv.addr=rmqnamesrv:9876 -Dcom.rocketmq.sendMessageWithVIPChannel=false"
+    depends_on:
+      - rmqnamesrv
+    networks:
+      default:
+        ipv4_address: 172.23.0.19
+
+networks:
+  default:
+    external:
+      name: allinone
